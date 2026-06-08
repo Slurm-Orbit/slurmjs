@@ -1,0 +1,16 @@
+{
+  "name": "slurmjs",
+  "version": "0.1.0",
+  "description": "A lightweight wrapper for the Slurm command line tool in JavaScript",
+  "author": "Xiaoyang Liu",
+  "license": "MIT",
+  "keywords": [
+    "slurm"
+  ],
+  "type": "module",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "dayjs": "^1.11.21"
+  }
+}
