@@ -1,6 +1,6 @@
 {
   "name": "slurmjs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A lightweight wrapper for the Slurm command line tool in JavaScript",
   "author": "Xiaoyang Liu",
   "license": "MIT",

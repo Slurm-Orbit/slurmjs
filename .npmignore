@@ -1,0 +1,4 @@
+test/
+bun.lock
+.gitignore
+CLAUDE.md
