@@ -1,4 +1,10 @@
-import { getSlurmClusterInfo, getSlurmJobInfo, getFinishedSlurmJobInfo, submitSlurmJob, cancelSlurmJob } from "../index.js";
+import {
+    getSlurmClusterInfo,
+    getSlurmJobInfo,
+    getFinishedSlurmJobInfo,
+    submitSlurmJob,
+    cancelSlurmJob,
+} from "../index.js";
 
 var clusterInfo = await getSlurmClusterInfo();
 console.log(clusterInfo.data);
@@ -9,4 +15,4 @@ console.log(jobs.data);
 var finishedJobs = await getFinishedSlurmJobInfo();
 console.log(finishedJobs.data[0]);
 res = await cancelSlurmJob(res.data);
-console.log(res.data);
+console.log(res);

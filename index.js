@@ -82,16 +82,16 @@ async function getSlurmJobInfo(kwargs = {}) {
 
 async function submitSlurmJob(jobScript, kwargs = {}) {
     var [error, output] = runSlurmCommand("sbatch", kwargs, [jobScript]);
-    var jobId = output.split(" ")[3];
     if (error) {
         return {
             error: error,
             success: false,
         };
     }
+    var jobId = parseInt(output.split(" ")[3]);
     return {
         success: true,
-        data: parseInt(jobId),
+        data: jobId,
     };
 }
 
