@@ -1,4 +1,5 @@
-test/
+*.test.js
 bun.lock
 .gitignore
-CLAUDE.md
+.npmignore
+AGENTS.md

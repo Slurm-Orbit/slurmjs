@@ -1,6 +1,6 @@
 # slurmjs
 
-在 JavaScript 中调用 Slurm 命令行工具的轻量封装。底层通过 `squeue`、`sbatch`、`scancel`、`sinfo`、`sacct` 与集群交互，并将 JSON 输出整理为统一的数据结构。
+在 JavaScript 中调用 Slurm 命令行工具的轻量封装。底层通过 `squeue`、`sbatch`、`scancel`、`sinfo`、`sacct`、`scontrol` 与集群交互，并将 JSON 输出整理为统一的数据结构。
 
 ## 环境要求
 
@@ -23,6 +23,7 @@ import {
   cancelSlurmJob,
   getSlurmClusterInfo,
   getFinishedSlurmJobInfo,
+  updateSlurmNodeState,
 } from "./index.js";
 
 // 查看集群分区信息
@@ -42,6 +43,10 @@ console.log(finished.data);
 
 // 取消作业
 await cancelSlurmJob(jobId);
+
+// 修改节点状态（需管理员权限）
+await updateSlurmNodeState("node01", "DRAIN", "maintenance");
+await updateSlurmNodeState("node01", "RESUME");
 ```
 
 项目内示例脚本：
@@ -146,4 +151,19 @@ bun test/test.js
 | `submitTime` | 提交时间（`Date`） |
 | `startTime`  | 开始时间（`Date`） |
 | `endTime`    | 结束时间（`Date`） |
+
+
+### `updateSlurmNodeState(nodeName, state, reason?, kwargs?)`
+
+调用 `scontrol update` 修改节点状态。通常需要管理员权限。
+
+- `nodeName`：节点名，支持 Slurm 节点列表表达式（如 `node[01-03]`）
+- `state`：目标状态，常见值包括 `IDLE`、`DOWN`、`DRAIN`、`RESUME` 等
+- `reason`：可选原因说明；设置 `DOWN` / `DRAIN` 时通常需要提供
+- 成功时 `data` 为空字符串
+
+```javascript
+await updateSlurmNodeState("node01", "DRAIN", "hardware check");
+await updateSlurmNodeState("node01", "RESUME");
+```
 

@@ -172,4 +172,35 @@ async function getFinishedSlurmJobInfo(kwargs = {}) {
         data: conciseJson,
     };
 }
-export { getSlurmJobInfo, submitSlurmJob, cancelSlurmJob, getSlurmClusterInfo, getFinishedSlurmJobInfo };
+
+async function updateSlurmNodeState(nodeName, state, reason = null, kwargs = {}) {
+    var updateArgs = [
+        "update",
+        `NodeName=${nodeName}`,
+        `State=${state}`,
+    ];
+    if (reason != null && reason !== "") {
+        var escapedReason = String(reason).replaceAll('"', '\\"');
+        updateArgs.push(`Reason="${escapedReason}"`);
+    }
+    var [error, output] = runSlurmCommand("scontrol", kwargs, updateArgs);
+    if (error) {
+        return {
+            error: error,
+            success: false,
+        };
+    }
+    return {
+        success: true,
+        data: "",
+    };
+}
+
+export {
+    getSlurmJobInfo,
+    submitSlurmJob,
+    cancelSlurmJob,
+    getSlurmClusterInfo,
+    getFinishedSlurmJobInfo,
+    updateSlurmNodeState,
+};
