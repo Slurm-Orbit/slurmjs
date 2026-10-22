@@ -9,39 +9,47 @@ function unixSecondsToDate(seconds) {
     return new Date(seconds * 1000);
 }
 
-function runSlurmCommand(command, kwargs, args=[]) {
-    var argLine = Object.entries(kwargs)
-        .map(([key, value]) => `${key.length > 1 ? "--" : "-"}${key} ${value}`)
-        .join(" ") + " " + args.join(" ");
-    var error = null;
-    var output = null;
+function getOption(key) {
+    return key.length > 1 ? "--" : "-" + key;
+} 
+function runSlurmCommand(command, args = [], options = [], kwargs = {}) {
+    var kwargsLine = Object.entries(kwargs)
+        .map(([key, value]) => getOption(key) + " " + value)
+        .join(" ") + " ";
+    var optionLine = Object.entries(options)
+        .map(key => getOption(key))
+        .join(" ");
+    var argsLine = args.join(" ");
     try {
-        output = execSync(`${command} ${argLine}`, {
+        return execSync(`${command} ${kwargsLine} ${optionLine} ${argsLine}`, {
             encoding: 'utf-8',
             stdio: ['pipe', 'pipe', 'pipe']
         }).toString();
     } catch (err) {
-        error = err.message;
-        var errorIndex = error.indexOf("error:");
+        var message = err.message;
+        var errorIndex = message.indexOf("error:");
         if (errorIndex != -1) {
-            var errorMessage = error.substring(errorIndex + 6).trim();
-            error = errorMessage;
+            throw new Error(message.substring(errorIndex + 6).trim(), { cause: err });
         }
-        else{
-            var errorLines = error.split("\n");
-            errorLines = errorLines.slice(1);
-            error = errorLines.join("");
-        }
+        throw err;
     }
-    return [error, output];
 }
 
-async function getSlurmJobInfo(kwargs = {}) {
-    var [error, output] = runSlurmCommand("squeue", {...kwargs, "json": ""});
+async function getSlurmVersion(){
+    var output = runSlurmCommand("sinfo", [], ["version"]);
+    return output.trim().split(" ")[1];
+}
+
+async function getSlurmQueueInfo(options = {}) {
+    var output = runSlurmCommand(
+        "squeue",
+        [],
+        ["json", ...Object.keys(options)],
+    );
     var resJson = JSON.parse(output);
-    var conciseJson = resJson.jobs.map(job => {
+    return resJson.jobs.map(job => {
         var startTime = unixSecondsToDate(job.start_time.number);
-        var runningTime = 0;
+        var runningTime;
         if (job.job_state.includes("RUNNING")){
             var currentTime = new Date();
             runningTime = currentTime - startTime;
@@ -68,51 +76,37 @@ async function getSlurmJobInfo(kwargs = {}) {
             name: job.name,
         };
     });
-    if (error) {
-        return {
-            error: error,
-            success: false,
-        };
-    }
-    return {
-        success: true,
-        data: conciseJson,
-    };
 }
 
-async function submitSlurmJob(jobScript, kwargs = {}) {
-    var [error, output] = runSlurmCommand("sbatch", kwargs, [jobScript]);
-    if (error) {
-        return {
-            error: error,
-            success: false,
-        };
-    }
-    var jobId = parseInt(output.split(" ")[3]);
-    return {
-        success: true,
-        data: jobId,
-    };
+async function submitSlurmJob(jobScript, options = {}) {
+    var output = runSlurmCommand(
+        "sbatch",
+        [jobScript],
+        Object.keys(options),
+    );
+    return parseInt(output.split(" ")[3]);
 }
 
-async function cancelSlurmJob(jobId, kwargs = {}) {
-    var [error, output] = runSlurmCommand("scancel", kwargs, [jobId]);
-    if (error) {
-        return {
-            error: error,
-            success: false,
-        };
-    }
-    return {
-        success: true,
-        data: "",
-    };
+async function cancelSlurmJob(jobId, options = {}) {
+    runSlurmCommand("scancel", [jobId], Object.keys(options));
 }
 
-async function getSlurmClusterInfo(kwargs = {}) {
-    var [error, output] = runSlurmCommand("sinfo", {...kwargs, "json": ""});
+async function holdSlurmJob(jobId, options = {}) {
+    runSlurmCommand("scontrol", ["hold", String(jobId)], Object.keys(options));
+}
+
+async function releaseSlurmJob(jobId, options = {}) {
+    runSlurmCommand("scontrol", ["release", String(jobId)], Object.keys(options));
+}
+
+async function getSlurmClusterInfo(options = {}) {
+    var output = runSlurmCommand(
+        "sinfo",
+        [],
+        ["json", ...Object.keys(options)],
+    );
     var resJson = JSON.parse(output);
-    var conciseJson = resJson.sinfo.map(sinfo => {
+    return resJson.sinfo.map(sinfo => {
         return {
             name: sinfo.partition.name,
             availability: sinfo.partition.partition.state,
@@ -125,31 +119,16 @@ async function getSlurmClusterInfo(kwargs = {}) {
             time_limit: sinfo.partition.maximums.time.number,
         };
     });
-    if (error) {
-        return {
-            error: error,
-            success: false,
-        };
-    }
-    return {
-        success: true,
-        data: conciseJson,
-    };
 }
 
-async function getFinishedSlurmJobInfo(kwargs = {}) {
-    var [error, output] = runSlurmCommand(
+async function getSlurmJobInfo(options = {}) {
+    var output = runSlurmCommand(
         "sacct",
-        {...kwargs, "json": ""}
+        [],
+        ["json", ...Object.keys(options)],
     );
-    if (error) {
-        return {
-            error: error,
-            success: false,
-        };
-    }
     var resJson = JSON.parse(output);
-    var conciseJson = resJson.jobs.filter(job => !job.state.current.includes("RUNNING")).map(job => {
+    return resJson.jobs.map(job => {
         return {
             jobId: job.job_id,
             account: job.account,
@@ -166,41 +145,91 @@ async function getFinishedSlurmJobInfo(kwargs = {}) {
             startTime: unixSecondsToDate(job.time.start),
             endTime: unixSecondsToDate(job.time.end),
         };
-    })
-    return {
-        success: true,    
-        data: conciseJson,
-    };
+    });
 }
 
-async function updateSlurmNodeState(nodeName, state, reason = null, kwargs = {}) {
-    var updateArgs = [
-        "update",
-        `NodeName=${nodeName}`,
-        `State=${state}`,
-    ];
-    if (reason != null && reason !== "") {
-        var escapedReason = String(reason).replaceAll('"', '\\"');
-        updateArgs.push(`Reason="${escapedReason}"`);
+async function updateSlurmNodeState(nodeName, state, options = {}) {
+    runSlurmCommand(
+        "scontrol",
+        ["update", `NodeName=${nodeName}`, `State=${state}`],
+        Object.keys(options),
+    );
+}
+
+async function getSlurmJobStat(jobId, target, options = {}) {
+    var output = runSlurmCommand(
+        "sstat",
+        [],
+        ["allsteps", "parsable2", ...Object.keys(options)],
+        { format: target.join(","), jobs: String(jobId) },
+    );
+    var lines = (output || "").trim().split("\n").filter(Boolean);
+    if (lines.length < 2) {
+        return {};
     }
-    var [error, output] = runSlurmCommand("scontrol", kwargs, updateArgs);
-    if (error) {
-        return {
-            error: error,
-            success: false,
-        };
-    }
-    return {
-        success: true,
-        data: "",
-    };
+    var headers = lines[0].split("|");
+    var cols = lines[1].split("|");
+    return cols.reduce((acc, col, index) => {
+        acc[headers[index]] = col;
+        return acc;
+    }, {});
+}
+
+async function getSlurmAccountInfo(options = {}) {
+    var output = runSlurmCommand(
+        "sacctmgr",
+        ["list", "account"],
+        ["json", ...Object.keys(options)],
+    );
+    var resJson = JSON.parse(output);
+    return (resJson.accounts || []).map(record => ({
+        name: record.name,
+        description: record.description,
+        organization: record.organization,
+        flags: record.flags,
+    }));
+}
+
+async function addSlurmAccount(options = {}, parent = "", description = "") {
+    var output = runSlurmCommand(
+        "sacctmgr",
+        ["add", "account", `parent=${parent}`, `description=${description}`],
+        ["immediate", ...Object.keys(options)],
+    );
+    return (output || "").trim();
+}
+
+async function modifySlurmAccount(where, set, options = {}) {
+    var output = runSlurmCommand(
+        "sacctmgr",
+        ["modify", "account", "where", `name=${where}`, "set", `description=${set}`],
+        ["immediate", ...Object.keys(options)],
+    );
+    return (output || "").trim();
+}
+
+async function deleteSlurmAccount(name, options = {}) {
+    var output = runSlurmCommand(
+        "sacctmgr",
+        ["delete", "account", `name=${name}`],
+        ["immediate", ...Object.keys(options)],
+    );
+    return (output || "").trim();
 }
 
 export {
+    getSlurmVersion,
     getSlurmJobInfo,
     submitSlurmJob,
     cancelSlurmJob,
     getSlurmClusterInfo,
-    getFinishedSlurmJobInfo,
+    getSlurmQueueInfo,
     updateSlurmNodeState,
+    getSlurmJobStat,
+    holdSlurmJob,
+    releaseSlurmJob,
+    getSlurmAccountInfo,
+    addSlurmAccount,
+    modifySlurmAccount,
+    deleteSlurmAccount,
 };

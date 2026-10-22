@@ -1,6 +1,6 @@
 {
   "name": "slurmjs",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "A lightweight wrapper for the Slurm command line tool in JavaScript",
   "author": "Xiaoyang Liu",
   "license": "MIT",
@@ -10,9 +10,15 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "bun test"
+    "test": "bun test",
+    "test:coverage": "bun test --coverage --coverage-reporter=text --coverage-reporter=lcov"
   },
   "dependencies": {
+    "@eslint/js": "^10.0.1",
     "dayjs": "^1.11.23"
+  },
+  "devDependencies": {
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0"
   }
 }
