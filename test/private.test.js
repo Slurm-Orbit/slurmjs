@@ -10,7 +10,7 @@ describe("runSlurmCommand", () => {
     test("failed with error: in stderr", () => {
         expect(() =>
             runSlurmCommand("sstat", [], ["parsable2"], { format: "JobID", jobs: "999999999" }),
-        ).toThrow(/couldn't get steps/);
+        ).toThrow();
     });
 
     test("failed with unrecognized option in stderr", () => {

@@ -51,6 +51,16 @@ describe("slurmjs", () => {
         });
     });
 
+    test("getSlurmNodeInfo returns cluster nodes", async () => {
+        const nodes = await slurmjs.getSlurmNodeInfo();
+        expect(Array.isArray(nodes)).toBe(true);
+        expect(nodes[0]).toMatchObject({
+            name: expect.any(String),
+            cpus: expect.any(Number),
+            realMemory: expect.any(Number),
+        });
+    });
+
     test("submitSlurmJob submits a job script", async () => {
         jobId = await slurmjs.submitSlurmJob(jobScriptPath);
         expect(typeof jobId).toBe("number");
@@ -130,8 +140,8 @@ describe("slurmjs", () => {
         expect(Array.isArray(accounts)).toBe(true);
         expect(accounts[0]).toMatchObject({
             name: expect.any(String),
+            parent: expect.any(String),
             description: expect.anything(),
-            organization: expect.anything(),
         });
     });
 

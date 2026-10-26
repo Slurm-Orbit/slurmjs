@@ -22,6 +22,7 @@ bun install
 import {
   getSlurmVersion,
   getSlurmClusterInfo,
+  getSlurmNodeInfo,
   submitSlurmJob,
   holdSlurmJob,
   releaseSlurmJob,
@@ -36,9 +37,13 @@ import {
 // Slurm 版本，例如 "25.11.2"
 const version = await getSlurmVersion();
 
-// 集群分区 / 节点信息
+// 集群分区信息
 const cluster = await getSlurmClusterInfo();
 console.log(cluster);
+
+// 节点信息（状态 / CPU / 内存 / GRES / 负载）
+const nodes = await getSlurmNodeInfo();
+console.log(nodes);
 
 // 提交作业，返回作业 ID（number）
 const jobId = await submitSlurmJob("job.slurm");
@@ -144,6 +149,33 @@ bun test
 | `nodes`        | `string[]` | 节点名列表                       |
 | `time_limit`   | `number`   | 最大时间限制（分钟），无限制时为 `0`        |
 
+### `getSlurmNodeInfo(options?)`
+
+调用 `scontrol show node --json`，返回集群中各节点的信息（`Array`）。
+
+| 字段              | 类型              | 说明                                 |
+| --------------- | --------------- | ---------------------------------- |
+| `name`          | `string`        | 节点名                                |
+| `address`       | `string`        | 节点地址                               |
+| `hostname`      | `string`        | 节点主机名                              |
+| `state`         | `string[]`      | 节点状态，如 `["IDLE"]`                   |
+| `partitions`    | `string[]`      | 所属分区                               |
+| `architecture`  | `string`        | 架构                                 |
+| `os`            | `string`        | 操作系统                               |
+| `cpus`          | `number`        | CPU 总数                             |
+| `effectiveCpus` | `number`        | 有效 CPU 数                           |
+| `allocCpus`     | `number`        | 已分配 CPU 数                          |
+| `idleCpus`      | `number`        | 空闲 CPU 数                           |
+| `cpuLoad`       | `number`        | CPU 负载（已除以 100，如 `48.15`）            |
+| `realMemory`    | `number`        | 实际内存（MB）                           |
+| `freeMem`       | `number \| null` | 空闲内存（MB），未采集时为 `null`               |
+| `allocMemory`   | `number`        | 已分配内存（MB）                          |
+| `disk`          | `number`        | 临时磁盘（MB）                           |
+| `gres`          | `string`        | GRES 总量，如 `"gpu:rtx4090d:8"`        |
+| `gresUsed`      | `string`        | 已分配的 GRES                          |
+| `reason`        | `string`        | 节点状态原因                             |
+| `bootTime`      | `Date \| null`  | 启动时间                               |
+
 ### `submitSlurmJob(jobScript, options?)`
 
 调用 `sbatch` 提交作业脚本。
@@ -228,14 +260,14 @@ await updateSlurmNodeState("node01", "RESUME");
 
 ### `getSlurmAccountInfo(options?)`
 
-调用 `sacctmgr list account --json`，查询账户列表（`Array`）。
+调用 `sacctmgr list account --json`，查询账户列表（`Array`）。父账户取自 `sacctmgr list assoc --json`，根账户的 `parent` 为空字符串。
 
-| 字段             | 类型         | 说明   |
-| -------------- | ---------- | ---- |
-| `name`         | `string`   | 账户名  |
-| `description`  | `string`   | 描述   |
-| `organization` | `string`   | 组织   |
-| `flags`        | `string[]` | 标志位  |
+| 字段            | 类型         | 说明            |
+| ------------- | ---------- | ------------- |
+| `name`        | `string`   | 账户名           |
+| `parent`      | `string`   | 父账户名（根账户为空）   |
+| `description` | `string`   | 描述            |
+| `flags`       | `string[]` | 标志位           |
 
 ### `addSlurmAccount(name, parent?, description?, options?)`
 

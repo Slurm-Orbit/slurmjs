@@ -6,6 +6,7 @@ export {
     holdSlurmJob,
     releaseSlurmJob,
     getSlurmClusterInfo,
+    getSlurmNodeInfo,
     getSlurmJobInfo,
     updateSlurmNodeState,
     getSlurmJobStat,
