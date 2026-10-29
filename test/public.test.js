@@ -1,34 +1,14 @@
 import { describe, test, expect, afterAll } from "bun:test";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { unlink } from "node:fs/promises";
 import * as slurmjs from "../index.js";
-
-const JOB_SCRIPT = `#!/bin/bash
-#SBATCH --job-name=wait_test
-#SBATCH --output=wait_test_%j.out
-#SBATCH --error=wait_test_%j.err
-#SBATCH --time=24:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --partition=GPU
-#SBATCH --mem=10M
-#SBATCH --gres=gpu:1
-echo "Job started at $(date)"
-echo "Node: $(hostname)"
-echo "Job ID: $SLURM_JOB_ID"
-echo "Entering wait"
-sleep 1000000
-echo "Job finished at $(date)"
-`;
 
 const INVALID_JOB_ID = 999999999;
 
 describe("slurmjs", () => {
     let jobId;
     let accountName = `test_slurm_account`;
-    const jobScriptPath = join(tmpdir(), `slurmjs-test-${Date.now()}.slurm`);
-    Bun.write(jobScriptPath, JOB_SCRIPT);
+    const jobScriptPath = join(import.meta.dir, "wait.slurm");
 
     test("getSlurmVersion returns the Slurm version", async () => {
         const version = await slurmjs.getSlurmVersion();
@@ -77,12 +57,14 @@ describe("slurmjs", () => {
         const heldJobs = await slurmjs.getSlurmQueueInfo();
         const held = heldJobs.find((j) => j.jobId === jobId);
         expect(String(held.status)).toMatch(/PENDING/i);
+        expect(held.hold).toBe(true);
 
         await slurmjs.releaseSlurmJob(jobId);
         await Bun.sleep(3000)
         const releasedJobs = await slurmjs.getSlurmQueueInfo();
         const released = releasedJobs.find((j) => j.jobId === jobId);
         expect(String(released.status)).toMatch(/RUNNING/i);
+        expect(released.hold).toBe(false);
     });
 
     test("holdSlurmJob and releaseSlurmJob throw for invalid job", async () => {
@@ -100,6 +82,7 @@ describe("slurmjs", () => {
             jobId,
             name: expect.any(String),
             status: expect.anything(),
+            hold: expect.any(Boolean),
             user: expect.any(String),
         });
     });
@@ -196,9 +179,6 @@ describe("slurmjs", () => {
             if (job?.stderr) {
                 await unlink(job.stderr).catch(() => {});
             }
-        }
-        if (jobScriptPath) {
-            await unlink(jobScriptPath).catch(() => {});
         }
     });
 });
